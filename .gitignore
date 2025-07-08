@@ -1,0 +1,4 @@
+vendor
+.env
+pod-cleanup-controller
+.idea/
