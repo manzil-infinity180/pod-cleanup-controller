@@ -58,14 +58,3 @@ func BuildSlackAttachment(eventType string, pod *corev1.Pod, restartCount int) s
 		},
 	}
 }
-
-/*
-attachment := buildSlackAttachment("CrashLoopBackOff", pod, 21)
-slackClient.PostMessage(channelID, slack.MsgOptionAttachments(attachment))
-
-
-attachment := buildSlackAttachment("Deleted", pod, 0)
-slackClient.PostMessage(channelID, slack.MsgOptionAttachments(attachment))
-
-
-**/
