@@ -1,44 +1,87 @@
-# pod-cleanup-controller
+# 🧹 Pod Cleanup Controller
 A controller that watches for pods in "Evicted" or "Failed" status and deletes them automatically after X minutes.
 
-```
-Use Case: A controller that watches for pods in "Evicted" or "Failed" status and deletes them automatically after X minutes.
+A Kubernetes controller written in Go that automatically deletes pods that are:
+- In `Failed` phase
+- In `Evicted` state
+- In `CrashLoopBackOff` with restart count ≥ 5
 
-Skills Practiced:
-
-client-go Shared Informer (manual way) or Kubebuilder scaffolding
-
-Use of channels, goroutines, WaitGroups for concurrent deletion
-
-JSON logging/formatting
-
-Leader election (optional)
+This project is built using `client-go` and uses shared informers for real-time event processing.
 
 ---
 
-✅ Phase 1: Pod Cleanup Controller Using Shared Informer (No Kubebuilder)
-Goal: Build a lightweight controller using client-go shared informer to delete "Failed" or "Evicted" pods after X minutes.
+## ✨ Features (IN Progress)
 
-🔧 Tools & Concepts You’ll Learn
-Go routines, channels, WaitGroup
+- Watches all pods across the cluster
+- Identifies problematic pods
+- Waits for a configurable delay (default 5 minutes)
+- Deletes the pod after grace period
+- Logs structured pod metadata in JSON
+- Lightweight and stateless
 
-SharedInformer (no Kubebuilder)
+---
 
-Kubernetes client-go
+## 📦 Use Cases (In progress)
+- Automated cleanup for crashlooping test/dev pods
+- Reclaiming cluster resources
+- Simplifying observability during CI/CD tests
+- Educational use for learning Kubernetes controllers and shared informers
 
-JSON logging
+---
 
-Graceful shutdown via context and signal.Notify
+## 🚀 Getting Started
 
-🔁 Basic Flow
-Start a shared informer to watch pods.
+### Prerequisites
 
-On pod ADD or UPDATE:
+- Go 1.20+
+- Access to a Kubernetes cluster (e.g., via `kubectl`)
+- [`kubectl` context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) configured to a running cluster
 
-If status is Failed or Evicted, spawn a goroutine to wait N minutes then delete it.
+---
 
-Use a buffered channel to avoid memory overload.
+## 🛠️ Running Locally
 
-Log actions in JSON format.
+Clone the repo and build:
+
+```bash
+git clone https://github.com/manzil-infinity180/pod-cleanup-controller.git
+cd pod-cleanup-controller
+
+go mod tidy
+go run main.go
 ```
 
+---
+## 🔬 How It Works
+The controller uses a shared informer to watch pod changes. It checks:
+1. pod.Status.Phase == Failed
+2. pod.Status.Reason == "Evicted"
+3. Any container with:
+   - Waiting.Reason == CrashLoopBackOff
+   - RestartCount >= 5
+
+* If a pod matches, it will:
+  - Sleep for 5 minutes (configurable)
+  - Delete the pod
+  - Log the deletion in JSON
+
+## Example 
+```yaml
+# crashloop.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: failed-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command: ["false"]
+    restartPolicy: Always
+```
+```bash
+kubectl apply -f crashloop.yaml
+
+```
+# 🙌 Acknowledgments
+Built by [@manzil-infinity180](https://github.com/manzil-infinity180) for learning and exploration of Kubernetes controllers and Go internals.
