@@ -8,6 +8,12 @@ A Kubernetes controller written in Go that automatically deletes pods that are:
 
 This project is built using `client-go` and uses shared informers for real-time event processing.
 
+## DEMO 
+
+
+https://github.com/user-attachments/assets/40987d28-b83e-475f-aa99-310f488e0894
+
+
 ---
 
 ## ✨ Features (IN Progress)
