@@ -8,6 +8,21 @@ A Kubernetes controller written in Go that automatically deletes pods that are:
 
 This project is built using `client-go` and uses shared informers for real-time event processing.
 
+## DEMO 
+```bash
+kubectl apply -f examples/failed-terminated-pod.yml
+kubectl apply -f examples/failed.yml
+
+// and after that put your cred into .env and run 
+SLACK_AUTH_TOKEN="---"
+SLACK_CHANNEL_ID="XXXXXXXX" // https://app.slack.com/client/T08Q5RCFWGM/C09XXXXEG (CXVVXVXVVXX <- channel id)
+
+go run main.go
+```
+
+https://github.com/user-attachments/assets/40987d28-b83e-475f-aa99-310f488e0894
+
+
 ---
 
 ## ✨ Features (IN Progress)
