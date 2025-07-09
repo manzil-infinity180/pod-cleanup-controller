@@ -2,3 +2,6 @@ vendor
 .env
 pod-cleanup-controller
 .idea/
+# Added by goreleaser init:
+dist/
+./dist
