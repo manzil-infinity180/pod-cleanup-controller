@@ -9,6 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/joho/godotenv"
+	slackFn "github.com/manzil-infinity180/pod-cleanup-controller/utils"
+	"github.com/slack-go/slack"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,6 +21,7 @@ import (
 	coreListers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"os"
 	"sync"
 	"time"
 )
@@ -31,15 +35,24 @@ type controller struct {
 	podLister      coreListers.PodLister
 	podCacheSynced cache.InformerSynced
 	//queue          workqueue.TypedRateLimitingInterface[any]
-	queue workqueue.RateLimitingInterface // deprecated one
+	queue       workqueue.RateLimitingInterface // deprecated one
+	channelID   string
+	clientSlack *slack.Client
 }
 
 func NewController(clientset kubernetes.Interface, podInformer coreInformer.PodInformer) *controller {
+	godotenv.Load(".env")
+	token := os.Getenv("SLACK_AUTH_TOKEN")
+	channelID := os.Getenv("SLACK_CHANNEL_ID")
+	clientSlack := slack.New(token, slack.OptionDebug(true))
+
 	c := &controller{
 		clientset:      clientset,
 		podLister:      podInformer.Lister(),
 		podCacheSynced: podInformer.Informer().HasSynced,
 		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pod-cleaner"),
+		clientSlack:    clientSlack,
+		channelID:      channelID,
 	}
 
 	podInformer.Informer().AddEventHandler(
@@ -148,6 +161,11 @@ func (c *controller) onAddUpdateController(pod *corev1.Pod) {
 		makeSeen(pod.UID)
 		fmt.Printf("🔥 Failed/Evicted pod detected: %s/%s\n",
 			pod.Namespace, pod.Name)
+		// sending to slack
+		fmt.Printf("Sending message to slack \n")
+		attachment := slackFn.BuildSlackAttachment("FailedOrEvicted", pod, 21)
+		c.clientSlack.PostMessage(c.channelID, slack.MsgOptionAttachments(attachment))
+
 		go c.deletePodFunc(pod)
 		return
 	}
@@ -158,11 +176,17 @@ func (c *controller) onAddUpdateController(pod *corev1.Pod) {
 			makeSeen(pod.UID)
 			fmt.Printf("🔥 CrashLoopBackOff pod detected: %s/%s (restarts: %d)\n",
 				pod.Namespace, pod.Name, cs.RestartCount)
+
+			// sending to slack
+			fmt.Printf("Sending message to slack \n")
+			attachment := slackFn.BuildSlackAttachment("CrashLoopBackOff", pod, 21)
+			c.clientSlack.PostMessage(c.channelID, slack.MsgOptionAttachments(attachment))
+
 			go c.deletePodFunc(pod)
 			return
 		}
 	}
-	obj := extractPodDetails{
+	obj := ExtractPodDetails{
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
 		Phase:     string(pod.Status.Phase),
@@ -186,7 +210,7 @@ func makeSeen(uid types.UID) {
 	}{})
 }
 
-type extractPodDetails struct {
+type ExtractPodDetails struct {
 	Name      string       `json:"name"`
 	Namespace string       `json:"namespace"`
 	Phase     string       `json:"phase"`
@@ -194,7 +218,7 @@ type extractPodDetails struct {
 }
 
 func (c *controller) deletePodFunc(pod *corev1.Pod) {
-	obj := extractPodDetails{
+	obj := ExtractPodDetails{
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
 		Phase:     string(pod.Status.Phase),
@@ -202,12 +226,22 @@ func (c *controller) deletePodFunc(pod *corev1.Pod) {
 		//Conditions: pod.Status.Conditions,
 	}
 	//ctx := context.Background()
-	time.Sleep(5 * time.Minute)
+	time.Sleep(20 * time.Second)
+	//time.Sleep(5 * time.Minute) // reducing for demo purpose
 	err := c.clientset.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 	if err != nil {
+		// sending to slack
+		fmt.Printf("Sending message to slack \n")
+		attachment := slackFn.BuildSlackAttachment("FailedToDelete", pod, 21)
+		c.clientSlack.PostMessage(c.channelID, slack.MsgOptionAttachments(attachment))
+
 		fmt.Printf("Failed to delete pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	} else {
 		if b, err := json.MarshalIndent(obj, "", "  "); err == nil {
+			// sending to slack
+			fmt.Printf("Sending message to slack \n")
+			attachment := slackFn.BuildSlackAttachment("Deleted", pod, 21)
+			c.clientSlack.PostMessage(c.channelID, slack.MsgOptionAttachments(attachment))
 			fmt.Printf("✅ Deleted pod:\n%s\n", b)
 		}
 	}
