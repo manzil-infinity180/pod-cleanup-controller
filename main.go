@@ -1,3 +1,6 @@
+// Contributed by: Rahul Vishwakarma
+// GitHub: https://github.com/manzil-infinity180
+// Date: July 2025
 package main
 
 import (
